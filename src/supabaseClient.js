@@ -1,7 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-// ดึงค่า URL และ Anon Key ที่เราตั้งไว้ในระบบความปลอดภัยของ Vercel และสภาพแวดล้อมจำลอง
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = 'https://eqzcyvrfjbihrqhxpsly.supabase.co';
+const supabaseAnonKey = 'sb_publishable_1qRJVp-7rRw_AC-eiTXKaw_2oaN0Ffz';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
