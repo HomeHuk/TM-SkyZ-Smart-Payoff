@@ -1,121 +1,71 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useEffect, useState } from 'react'
+import { supabase } from './supabaseClient'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [cards, setCards] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // ฟังก์ชันดึงข้อมูลจาก Supabase
+  const fetchCreditCards = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('credit_cards')
+        .select('*')
+        .order('due_date', { ascending: true }) // เรียงตามวันครบกำหนดชำระ
+
+      if (error) throw error
+      if (data) setCards(data)
+    } catch (error) {
+      console.error('Error fetching data:', error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCreditCards()
+  }, [])
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ color: '#4F46E5', textAlign: 'center' }}>💳 TM-SkyZ Smart Payoff</h1>
+      <p style={{ textAlign: 'center', color: '#666' }}>ระบบบริหารจัดการและวางแผนแก้ไขปัญหาหนี้บัตรเครดิต</p>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {loading ? (
+        <p style={{ textAlign: 'center' }}>กำลังโหลดข้อมูลจากหลังบ้าน...</p>
+      ) : (
+        <div style={{ overflowX: 'auto', marginTop: '30px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#4F46E5', color: 'white' }}>
+                <th style={{ padding: '12px', border: '1px solid #ddd' }}>ชื่อบัญชี / บัตร</th>
+                <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>ยอดหนี้คงเหลือ (บาท)</th>
+                <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>ยอดชำระขั้นต่ำ (บาท)</th>
+                <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>วันครบกำหนดชำระ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cards.map((card) => (
+                <tr key={card.id} style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={{ padding: '12px', border: '1px solid #ddd', fontWeight: 'bold' }}>{card.card_name}</td>
+                  <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right', color: '#DC2626' }}>
+                    {Number(card.total_debt).toLocaleString()}
+                  </td>
+                  <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right', color: '#D97706' }}>
+                    {Number(card.minimum_payment).toLocaleString()}
+                  </td>
+                  <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>
+                    วันที่ {card.due_date} ของเดือน
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      )}
+    </div>
   )
 }
 
