@@ -4,46 +4,43 @@ function Gateway() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
-      <h1>ยินดีต้อนรับสู่ TM-SkyZ</h1>
-      <p>กรุณาเลือกช่องทางเข้าใช้งาน</p>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', marginTop: '30px' }}>
-        {/* ปุ่มเดิม */}
-        <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-          <button 
-            onClick={() => navigate('/login?type=user')}
-            style={{ padding: '20px 40px', fontSize: '18px', cursor: 'pointer', backgroundColor: '#4F46E5', color: 'white', border: 'none', borderRadius: '10px' }}
-          >
-            สำหรับสมาชิก
-          </button>
-          <button 
-            onClick={() => navigate('/login?type=admin')}
-            style={{ padding: '20px 40px', fontSize: '18px', cursor: 'pointer', backgroundColor: '#10B981', color: 'white', border: 'none', borderRadius: '10px' }}
-          >
-            สำหรับแอดมิน
-          </button>
-        </div>
+    <div style={{ 
+      display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
+      minHeight: '100vh', padding: '20px', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" 
+    }}>
+      {/* ส่วนหัว */}
+      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <h1 style={{ fontSize: 'clamp(24px, 5vw, 36px)', color: '#0f172a', marginBottom: '10px' }}>TM-SkyZ Financial</h1>
+        <p style={{ fontSize: 'clamp(14px, 2vw, 16px)', color: '#64748b' }}>จัดการการเงินของคุณอย่างเหนือระดับ</p>
+      </div>
 
-        {/* ปุ่มสมัครสมาชิกใหม่ที่เพิ่มเข้ามา */}
-        <button 
-          onClick={() => navigate('/register')} 
-          style={{ 
-            padding: '12px 30px', 
-            fontSize: '16px', 
-            cursor: 'pointer', 
-            backgroundColor: 'transparent', 
-            color: '#4F46E5', 
-            border: '2px solid #4F46E5', 
-            borderRadius: '10px',
-            marginTop: '10px'
-          }}
-        >
+      {/* แผงปุ่มกด */}
+      <div style={{ 
+        display: 'grid', gridTemplateColumns: '1fr', gap: '16px', 
+        width: '100%', maxWidth: '400px' 
+      }}>
+        <button onClick={() => navigate('/login?type=user')} style={buttonStyle('#ffffff', '#0f172a', '1px solid #e2e8f0')}>
+          เข้าสู่ระบบสมาชิก
+        </button>
+        <button onClick={() => navigate('/login?type=admin')} style={buttonStyle('#0f172a', '#ffffff', 'none')}>
+          สำหรับผู้ดูแลระบบ
+        </button>
+        
+        <hr style={{ width: '100%', border: '0', borderTop: '1px solid #e2e8f0', margin: '10px 0' }} />
+        
+        <button onClick={() => navigate('/register')} style={buttonStyle('transparent', '#4f46e5', 'none', '14px')}>
           สมัครสมาชิกใหม่
         </button>
       </div>
     </div>
   );
 }
+
+// Helper function เพื่อลดโค้ดซ้ำและจัดสไตล์ปุ่มให้ทันสมัย
+const buttonStyle = (bg, color, border, fontSize = '16px') => ({
+  padding: '16px', fontSize: fontSize, cursor: 'pointer', backgroundColor: bg, 
+  color: color, border: border, borderRadius: '12px', fontWeight: '600',
+  transition: 'all 0.3s ease', display: 'flex', justifyContent: 'center'
+});
 
 export default Gateway;
