@@ -2,18 +2,26 @@ import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
+
 function Dashboard() {
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [newCard, setNewCard] = useState({ card_name: '', total_debt: 0, minimum_payment: 0, due_date: '' });
+    // 1. เพิ่ม State สำหรับจัดการเดือนและ UserID
+    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // ปี-เดือน
+    const [userPhone, setUserPhone] = useState('');
+
+
     const navigate = useNavigate();
+
 
     const handleAddCard = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         const { error } = await supabase
             .from('credit_cards')
-            .insert([{ ...newCard, user_id: user.id }]);
+            .insert([{ ...newCard, user_id: user.id, month: selectedMonth }]);
+
 
         if (error) {
             console.error("Error adding card:", error);
@@ -24,37 +32,116 @@ function Dashboard() {
         }
     };
 
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         navigate('/login');
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [navigate]);
 
-    const fetchData = async () => {
-        setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { navigate('/login'); return; }
+    // ฟังก์ชันนี้เรียกใช้เมื่อ selectedMonth เปลี่ยน หรือตอนโหลดหน้าครั้งแรก
+   const fetchData = async (targetMonth) => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-        const { data, error } = await supabase
+    // 1. ดึงข้อมูลของเดือนที่เลือก
+    let { data, error } = await supabase
+        .from('credit_cards')
+        .select('*') // ดึงทุกข้อมูล
+        .eq('user_id', user.id)
+        .eq('month', targetMonth)
+        .order('due_date', { ascending: true });
+
+    // 2. ถ้าเดือนที่เลือกว่างเปล่า ให้ Copy จาก 2026-06
+    if (data && data.length === 0 && targetMonth !== '2026-06') {
+        const { data: masterData } = await supabase
             .from('credit_cards')
-            .select('*')
+            .select('*') // ดึงข้อมูล Master มาทั้งหมด
             .eq('user_id', user.id)
-            .order('due_date', { ascending: true });
+            .eq('month', '2026-06');
 
-        if (error) console.error("Error fetching data:", error);
-        if (data) setCards(data);
-        setLoading(false);
-    };
+        if (masterData && masterData.length > 0) {
+            // สร้างข้อมูลชุดใหม่จากรายการ Master
+            const newData = masterData.map(c => ({
+                card_name: c.card_name,
+                total_debt: c.total_debt,
+                minimum_payment: c.minimum_payment,
+                due_date: c.due_date,
+                interest_rate: c.interest_rate,
+                user_id: user.id,
+                month: targetMonth, // เปลี่ยนเป็นเดือนใหม่
+                paid_amount: 0,
+                interest_paid: 0,
+                principal_paid: 0,
+                cash_back: 0,
+                cashback_used: 0
+            }));
+
+            // บันทึกรายการใหม่ทั้งหมดลง DB
+            await supabase.from('credit_cards').insert(newData);
+            
+            // ดึงข้อมูลอีกครั้งเพื่อให้แสดงผลครบ
+            const { data: finalData } = await supabase
+                .from('credit_cards')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('month', targetMonth)
+                .order('id', { ascending: true });
+            data = finalData;
+        }
+    }
+
+    setCards(data || []);
+    setLoading(false);
+};
+
+
+    // ใช้ useEffect นี้เพียงชุดเดียวเพื่อกระตุ้นการดึงข้อมูล
+    useEffect(() => {
+        fetchData(selectedMonth);
+    }, [selectedMonth, navigate]);
+
 
     const updateCardData = async (id, field, value) => {
         const numValue = value === '' ? 0 : Number(value);
+
+
+        // 1. อัปเดตในฐานข้อมูลก่อน
         await supabase.from('credit_cards').update({ [field]: numValue }).eq('id', id);
-        fetchData(); // อัปเดตข้อมูล UI ให้เป็นปัจจุบันเสมอ
+
+
+        // 2. อัปเดตเฉพาะ State ในเครื่อง (ไม่ต้องเรียก fetchData() ใหม่ทั้งชุด)
+        setCards(prevCards => prevCards.map(card =>
+            card.id === id ? { ...card, [field]: numValue } : card
+        ));
     };
 
+    const changeMonth = (offset) => {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        // สร้าง Date object โดยใช้ปีและเดือน (เดือนใน JS เริ่มที่ 0)
+        const newDate = new Date(year, month - 1 + offset);
+        setSelectedMonth(newDate.toISOString().slice(0, 7));
+    };
+
+
+    const handleUpdateCard = async (id, field, value) => {
+        // 1. อัปเดตที่ฐานข้อมูล Supabase
+        const { error } = await supabase
+            .from('credit_cards')
+            .update({ [field]: value })
+            .eq('id', id);
+
+
+        if (error) {
+            console.error("Error updating:", error);
+        } else {
+            // 2. อัปเดตใน UI (State) ให้เป็นค่าปัจจุบัน
+            setCards(prev => prev.map(card =>
+                card.id === id ? { ...card, [field]: value } : card
+            ));
+        }
+    };
     const totals = cards.reduce((acc, c) => {
         acc.limit += Number(c.total_debt || 0);
         acc.minPay += Number(c.minimum_payment || 0);
@@ -66,8 +153,10 @@ function Dashboard() {
         return acc;
     }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
 
-    // ปรับสูตรหนี้คงเหลือสุทธิ: ใช้ยอดหนี้ลบด้วย เงินต้นที่จ่ายไป และ เงินคืนที่ใช้ไปจริง
-    const netDebt = totals.limit - (totals.principalPaid + totals.cashbackUsedTotal);
+
+    // หนี้คงเหลือ = (หนี้เริ่มต้น - เงินต้นที่จ่ายไป) + เงินคืนที่ใช้ไป
+    const netDebt = (totals.limit - totals.principalPaid) + totals.cashbackUsedTotal;
+
 
     const SummaryCard = ({ title, value, color }) => (
         <div style={{ padding: '15px', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderTop: `4px solid ${color}` }}>
@@ -76,50 +165,89 @@ function Dashboard() {
         </div>
     );
 
+    const copyPreviousMonthData = async () => {
+        // 1. หาเดือนก่อนหน้า (เช่น 2026-07 -> 2026-06)
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const prevMonthDate = new Date(year, month - 2); // -2 เพราะ month เริ่มที่ 0
+        const prevMonthStr = prevMonthDate.toISOString().slice(0, 7);
+
+        // 2. ดึงข้อมูลจากเดือนก่อนหน้า
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: prevData } = await supabase
+            .from('credit_cards')
+            .select('card_name, total_debt, minimum_payment, due_date')
+            .eq('user_id', user.id)
+            .eq('month', prevMonthStr);
+
+        if (prevData && prevData.length > 0) {
+            // 3. เตรียมข้อมูลใหม่สำหรับเดือนปัจจุบัน
+            const newData = prevData.map(c => ({
+                ...c,
+                user_id: user.id,
+                month: selectedMonth,
+                paid_amount: 0,
+                interest_paid: 0,
+                principal_paid: 0,
+                cash_back: 0,
+                cashback_used: 0
+            }));
+
+            // 4. บันทึกลงฐานข้อมูล
+            await supabase.from('credit_cards').insert(newData);
+            fetchData(selectedMonth); // ดึงข้อมูลใหม่มาโชว์
+        } else {
+            alert("ไม่พบข้อมูลจากเดือนก่อนหน้า");
+        }
+    };
+
+
     return (
         <div style={{ padding: '20px', fontFamily: "'Segoe UI', sans-serif", backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-            <header style={{ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: '20px',
-    paddingBottom: '10px',
-    borderBottom: '1px solid #e2e8f0' // เพิ่มเส้นคั่นให้ดูมีมิติ
-}}>
-    <h1 style={{ fontSize: '1.5rem', margin: 0 }}>📊 รายการหนี้สินและการจ่าย</h1>
-    
-    {/* สร้าง div หุ้มปุ่มเพื่อให้อยู่รวมกลุ่มกันทางขวา */}
-    <div style={{ display: 'flex', gap: '10px' }}>
-        <button 
-            onClick={() => setShowForm(true)} 
-            style={{ 
-                padding: '8px 16px', 
-                backgroundColor: '#0f172a', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '6px', 
-                cursor: 'pointer',
-                fontWeight: '500'
-            }}
-        >
-            + เพิ่มสินเชื่อใหม่
-        </button>
-        <button 
-            onClick={handleLogout} 
-            style={{ 
-                padding: '8px 16px', 
-                backgroundColor: '#ef4444', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '6px', 
-                cursor: 'pointer',
-                fontWeight: '500'
-            }}
-        >
-            ออกจากระบบ
-        </button>
-    </div>
-</header>
+            <header style={{
+                marginBottom: '20px',
+                backgroundColor: '#ffffff', // ใส่พื้นหลังสีขาว
+                padding: '15px 20px',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                borderLeft: '5px solid #0f172a' // เพิ่มแถบสีเน้นทางด้านซ้าย
+            }}>
+                {/* ส่วนรหัสสมาชิก: ชิดซ้ายชัดเจน */}
+                <div style={{
+                    fontSize: '0.85rem',
+                    color: '#475569',
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
+                    <span>👤 รหัสสมาชิก:</span>
+                    <strong style={{ color: '#0f172a', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
+                        {userPhone}
+                    </strong>
+                </div>
+
+
+                {/* ส่วนชื่อหัวข้อและปุ่มควบคุม */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h1 style={{ fontSize: '1.5rem', margin: 0, color: '#1e293b' }}>
+                        📊 รายการหนี้สินและการจ่าย ({selectedMonth})
+                    </h1>
+
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                        />
+                        <button onClick={() => window.print()} style={actionButtonStyle('#64748b')}>🖨️ ปริ้นท์</button>
+                        <button onClick={() => setShowForm(true)} style={actionButtonStyle('#0f172a')}>+ เพิ่มสินเชื่อ</button>
+                        <button onClick={handleLogout} style={actionButtonStyle('#ef4444')}>ออก</button>
+                    </div>
+                </div>
+            </header>
+
 
             {loading ? <p>กำลังโหลดข้อมูล...</p> : (
                 <>
@@ -133,6 +261,7 @@ function Dashboard() {
                         <SummaryCard title="เงินคืนที่ใช้" value={totals.cashbackUsedTotal} color="#6366f1" />
                         <SummaryCard title="หนี้คงเหลือ" value={netDebt} color="#ef4444" />
                     </div>
+
 
                     <div style={{ background: '#fff', borderRadius: '12px', overflowX: 'auto', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -176,13 +305,14 @@ function Dashboard() {
                                             />
                                         </td>
                                         <td style={{ padding: '12px', fontWeight: 'bold', color: '#e11d48' }}>
-                                            {(Number(c.total_debt || 0) - (Number(c.principal_paid || 0) + Number(c.cash_back || 0))).toLocaleString()}
+                                            {(Number(c.total_debt || 0) - Number(c.principal_paid || 0) + Number(c.cashback_used || 0)).toLocaleString()}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
+
 
                     {showForm && (
                         <div style={{
@@ -195,6 +325,7 @@ function Dashboard() {
                             border: '1px solid #e2e8f0'
                         }}>
                             <h2 style={{ fontSize: '1.1rem', marginBottom: '20px', color: '#1e293b' }}>เพิ่มสินเชื่อใหม่</h2>
+
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                 {[
@@ -220,6 +351,7 @@ function Dashboard() {
                                 ))}
                             </div>
 
+
                             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                                 <button onClick={() => setShowForm(false)} style={{ padding: '10px 20px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
                                     ยกเลิก
@@ -236,3 +368,9 @@ function Dashboard() {
     );
 }
 export default Dashboard;
+// เพิ่ม helper function นี้ไว้ท้ายไฟล์เพื่อความสะอาดของโค้ดครับ
+const actionButtonStyle = (bgColor) => ({
+    padding: '8px 16px', backgroundColor: bgColor, color: 'white',
+    border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500'
+});
+
