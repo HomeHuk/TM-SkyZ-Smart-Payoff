@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react'; // เติม useMemo เข้าไปตรงนี้
 import { supabase } from './supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
@@ -143,54 +143,58 @@ function Dashboard() {
         }
     };
 
-    const totals = cards.reduce((acc, c) => {
+   // --- วางไว้ใน Dashboard function เหนือ return ---
+
+// 1. คำนวณยอดรวมรายบรรทัด (อันเดิมของคุณ)
+const totals = useMemo(() => {
+    return cards.reduce((acc, c) => {
         acc.limit += Number(c.total_debt || 0);
         acc.minPay += Number(c.minimum_payment || 0);
         acc.paidReal += Number(c.paid_amount || 0);
         acc.principalPaid += Number(c.principal_paid || 0);
         acc.interestPaid += Number(c.interest_paid || 0);
-        acc.cashbackTotal += Number(c.cash_back || 0); // รวมเงินคืนรายบัตร
+        acc.cashbackTotal += Number(c.cash_back || 0);
         acc.cashbackUsedTotal += Number(c.cashback_used || 0);
         return acc;
     }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
+}, [cards]);
 
-    // คำนวณยอดรวมหนี้ทั้งสิ้น (Credit Card + Loan)
-    const totalAllDebt = cards
-        .filter(item => item.type === 'Credit Card' || item.type === 'Loan')
-        .reduce((sum, item) => sum + (Number(item.total_debt) || 0), 0);
+// 2. คำนวณแยกประเภทเพื่อให้เลขตรง
+const totalCreditCardLimit = useMemo(() => 
+    cards
+        .filter(item => item.type === 'Credit Card')
+        .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
+, [cards]);
 
-    // 1. ยอดรวมเฉพาะบัตรเครดิต (Credit Card)
-    const totalCreditCardDebt = useMemo(() =>
-        cards
-            .filter(item => item.type === 'Credit Card')
-            .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
-        , [cards]);
-
-    // คำนวณยอดรวมเฉพาะสินเชื่อ (Loan)
-    const totalLoanDebt = cards
+const totalLoanDebt = useMemo(() => 
+    cards
         .filter(item => item.type === 'Loan')
-        .reduce((sum, item) => sum + Number(item.total_debt), 0);
+        .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
+, [cards]);
 
-    // ยอดสินเชื่อคงเหลือปัจจุบัน
-    const totalLoanBalance = cards
+const totalAllDebt = totalCreditCardLimit + totalLoanDebt;
+
+const totalLoanBalance = useMemo(() => 
+    cards
         .filter(item => item.type === 'Loan')
         .reduce((sum, item) => {
-            // หนี้คงเหลือรายใบ = ยอดเริ่มต้น - เงินต้นที่จ่ายแล้ว
-            const balance = Number(item.total_debt) - Number(item.principal_paid || 0);
+            const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
             return sum + (balance > 0 ? balance : 0);
-        }, 0);
+        }, 0)
+, [cards]);
 
-    // ยอดคงเหลือบัตรเครดิตปัจจุบัน
-    const totalCreditCardBalance = cards
+const totalCreditCardBalance = useMemo(() => 
+    cards
         .filter(item => item.type === 'Credit Card')
         .reduce((sum, item) => {
-            // หนี้คงเหลือรายใบ = ยอดเริ่มต้น - เงินต้นที่จ่ายแล้ว
-            const balance = Number(item.total_debt) - Number(item.principal_paid || 0);
+            const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
             return sum + (balance > 0 ? balance : 0);
-        }, 0);
+        }, 0)
+, [cards]);
 
-    // หนี้คงเหลือ = (ยอดหนี้รวมทั้งสิ้น - เงินต้นที่จ่ายไป) + เงินคืนที่ใช้ไป
-    const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
+const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
+
+// --- ถึงจุดนี้ค่อยเริ่ม return JSX ---
 
 
     const SummaryCard = ({ title, value, color }) => (
