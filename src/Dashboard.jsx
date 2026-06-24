@@ -153,16 +153,36 @@ function Dashboard() {
         return acc;
     }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
 
-    // คำนวณยอดรวมทั้งหมด (บัตร + สินเชื่อ)
-    const totalAllDebt = cards.reduce((sum, item) => sum + Number(item.total_debt), 0);
+    // คำนวณยอดรวมหนี้ทั้งสิ้น (Credit Card + Loan)
+    const totalAllDebt = cards
+        .filter(item => item.type === 'Credit Card' || item.type === 'Loan')
+        .reduce((sum, item) => sum + (Number(item.total_debt) || 0), 0);
 
     // คำนวณยอดรวมเฉพาะสินเชื่อ (Loan)
     const totalLoanDebt = cards
         .filter(item => item.type === 'Loan')
         .reduce((sum, item) => sum + Number(item.total_debt), 0);
 
-    // หนี้คงเหลือ = (หนี้เริ่มต้น - เงินต้นที่จ่ายไป) + เงินคืนที่ใช้ไป
-    const netDebt = (totals.limit - totals.principalPaid) + totals.cashbackUsedTotal;
+    // ยอดสินเชื่อคงเหลือปัจจุบัน
+    const totalLoanBalance = cards
+        .filter(item => item.type === 'Loan')
+        .reduce((sum, item) => {
+            // หนี้คงเหลือรายใบ = ยอดเริ่มต้น - เงินต้นที่จ่ายแล้ว
+            const balance = Number(item.total_debt) - Number(item.principal_paid || 0);
+            return sum + (balance > 0 ? balance : 0);
+        }, 0);
+
+    // ยอดคงเหลือบัตรเครดิตปัจจุบัน
+    const totalCreditCardBalance = cards
+        .filter(item => item.type === 'Credit Card')
+        .reduce((sum, item) => {
+            // หนี้คงเหลือรายใบ = ยอดเริ่มต้น - เงินต้นที่จ่ายแล้ว
+            const balance = Number(item.total_debt) - Number(item.principal_paid || 0);
+            return sum + (balance > 0 ? balance : 0);
+        }, 0);
+
+    // หนี้คงเหลือ = (ยอดหนี้รวมทั้งสิ้น - เงินต้นที่จ่ายไป) + เงินคืนที่ใช้ไป
+    const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
 
 
     const SummaryCard = ({ title, value, color }) => (
@@ -269,6 +289,8 @@ function Dashboard() {
                         <SummaryCard title="ดอกเบี้ยที่จ่าย" value={totals.interestPaid} color="#f97316" />
                         <SummaryCard title="เงินคืนรวม" value={totals.cashbackTotal} color="#8b5cf6" />
                         <SummaryCard title="เงินคืนที่ใช้" value={totals.cashbackUsedTotal} color="#6366f1" />
+                        <SummaryCard title="ยอดสินเชื่อคงเหลือ" value={totalLoanBalance.toLocaleString()} color="#db2777" />
+                        <SummaryCard title="ยอดบัตรเครดิตคงเหลือ" value={totalCreditCardBalance.toLocaleString()} color="#3b82f6" />
                         <SummaryCard title="หนี้คงเหลือ" value={netDebt} color="#ef4444" />
                     </div>
 
