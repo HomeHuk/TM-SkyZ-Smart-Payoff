@@ -143,58 +143,55 @@ function Dashboard() {
         }
     };
 
-   // --- วางไว้ใน Dashboard function เหนือ return ---
+    // --- โค้ดคำนวณ Dashboard ---
 
-// 1. คำนวณยอดรวมรายบรรทัด (อันเดิมของคุณ)
-const totals = useMemo(() => {
-    return cards.reduce((acc, c) => {
-        acc.limit += Number(c.total_debt || 0);
-        acc.minPay += Number(c.minimum_payment || 0);
-        acc.paidReal += Number(c.paid_amount || 0);
-        acc.principalPaid += Number(c.principal_paid || 0);
-        acc.interestPaid += Number(c.interest_paid || 0);
-        acc.cashbackTotal += Number(c.cash_back || 0);
-        acc.cashbackUsedTotal += Number(c.cashback_used || 0);
-        return acc;
-    }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
-}, [cards]);
+    const totals = useMemo(() => {
+        return cards.reduce((acc, c) => {
+            acc.limit += Number(c.total_debt || 0);
+            acc.minPay += Number(c.minimum_payment || 0);
+            acc.paidReal += Number(c.paid_amount || 0);
+            acc.principalPaid += Number(c.principal_paid || 0);
+            acc.interestPaid += Number(c.interest_paid || 0);
+            acc.cashbackTotal += Number(c.cash_back || 0);
+            acc.cashbackUsedTotal += Number(c.cashback_used || 0);
+            return acc;
+        }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
+    }, [cards]);
 
-// 2. คำนวณแยกประเภทเพื่อให้เลขตรง
-const totalCreditCardLimit = useMemo(() => 
-    cards
-        .filter(item => item.type === 'Credit Card')
-        .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
-, [cards]);
+    // ปรับการคำนวณแยกประเภทให้แม่นยำด้วยการใช้ toLowerCase()
+    const totalCreditCardLimit = useMemo(() =>
+        cards
+            .filter(item => item.type && item.type.toLowerCase().trim() === 'credit card')
+            .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
+        , [cards]);
 
-const totalLoanDebt = useMemo(() => 
-    cards
-        .filter(item => item.type === 'Loan')
-        .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
-, [cards]);
+    const totalLoanDebt = useMemo(() =>
+        cards
+            .filter(item => item.type && item.type.toLowerCase().trim() === 'loan')
+            .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
+        , [cards]);
 
-const totalAllDebt = totalCreditCardLimit + totalLoanDebt;
+    const totalAllDebt = totalCreditCardLimit + totalLoanDebt;
 
-const totalLoanBalance = useMemo(() => 
-    cards
-        .filter(item => item.type === 'Loan')
-        .reduce((sum, item) => {
-            const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
-            return sum + (balance > 0 ? balance : 0);
-        }, 0)
-, [cards]);
+    const totalLoanBalance = useMemo(() =>
+        cards
+            .filter(item => item.type && item.type.toLowerCase().trim() === 'loan')
+            .reduce((sum, item) => {
+                const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
+                return sum + (balance > 0 ? balance : 0);
+            }, 0)
+        , [cards]);
 
-const totalCreditCardBalance = useMemo(() => 
-    cards
-        .filter(item => item.type === 'Credit Card')
-        .reduce((sum, item) => {
-            const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
-            return sum + (balance > 0 ? balance : 0);
-        }, 0)
-, [cards]);
+    const totalCreditCardBalance = useMemo(() =>
+        cards
+            .filter(item => item.type && item.type.toLowerCase().trim() === 'credit card')
+            .reduce((sum, item) => {
+                const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
+                return sum + (balance > 0 ? balance : 0);
+            }, 0)
+        , [cards]);
 
-const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
-
-// --- ถึงจุดนี้ค่อยเริ่ม return JSX ---
+    const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
 
 
     const SummaryCard = ({ title, value, color }) => (
@@ -291,19 +288,18 @@ const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal
             {loading ? <p>กำลังโหลดข้อมูล...</p> : (
                 <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '25px' }}>
-                        {/* สองอันนี้คืออันใหม่ที่คุณต้องการ */}
                         <SummaryCard title="ยอดรวมหนี้ทั้งสิ้น" value={totalAllDebt.toLocaleString()} color="#7c3aed" />
                         <SummaryCard title="ยอดรวมสินเชื่อ" value={totalLoanDebt.toLocaleString()} color="#be185d" />
-                        <SummaryCard title="วงเงินรวม" value={totals.limit} color="#3b82f6" />
-                        <SummaryCard title="ขั้นต่ำต้องจ่าย" value={totals.minPay} color="#f59e0b" />
-                        <SummaryCard title="จ่ายจริงรวม" value={totals.paidReal} color="#059669" />
-                        <SummaryCard title="เงินต้นที่จ่าย" value={totals.principalPaid} color="#10b981" />
-                        <SummaryCard title="ดอกเบี้ยที่จ่าย" value={totals.interestPaid} color="#f97316" />
-                        <SummaryCard title="เงินคืนรวม" value={totals.cashbackTotal} color="#8b5cf6" />
-                        <SummaryCard title="เงินคืนที่ใช้" value={totals.cashbackUsedTotal} color="#6366f1" />
+                        <SummaryCard title="วงเงินรวม (บัตร)" value={totalCreditCardLimit.toLocaleString()} color="#3b82f6" />
+                        <SummaryCard title="ขั้นต่ำต้องจ่าย" value={totals.minPay.toLocaleString()} color="#f59e0b" />
+                        <SummaryCard title="จ่ายจริงรวม" value={totals.paidReal.toLocaleString()} color="#059669" />
+                        <SummaryCard title="เงินต้นที่จ่าย" value={totals.principalPaid.toLocaleString()} color="#10b981" />
+                        <SummaryCard title="ดอกเบี้ยที่จ่าย" value={totals.interestPaid.toLocaleString()} color="#f97316" />
+                        <SummaryCard title="เงินคืนรวม" value={totals.cashbackTotal.toLocaleString()} color="#8b5cf6" />
+                        <SummaryCard title="เงินคืนที่ใช้" value={totals.cashbackUsedTotal.toLocaleString()} color="#6366f1" />
                         <SummaryCard title="สินเชื่อคงเหลือ" value={totalLoanBalance.toLocaleString()} color="#db2777" />
                         <SummaryCard title="บัตรเครดิตคงเหลือ" value={totalCreditCardBalance.toLocaleString()} color="#3b82f6" />
-                        <SummaryCard title="ยอดหนี้คงเหลือทั้งสิ้น" value={netDebt} color="#ef4444" />
+                        <SummaryCard title="ยอดหนี้คงเหลือทั้งสิ้น" value={netDebt.toLocaleString()} color="#ef4444" />
                     </div>
 
 
