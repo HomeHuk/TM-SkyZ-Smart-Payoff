@@ -191,7 +191,8 @@ function Dashboard() {
             }, 0)
         , [cards]);
 
-    const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
+    // แก้ไขบรรทัด netDebt ใน Dashboard.jsx เป็น:
+    const netDebt = totalLoanBalance + totalCreditCardBalance;
 
 
     const SummaryCard = ({ title, value, color }) => (
