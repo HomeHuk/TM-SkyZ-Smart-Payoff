@@ -187,6 +187,13 @@ const totalCreditCardBalance = useMemo(() =>
 // 5. หนี้คงเหลือสุทธิ
 const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
 
+// เพิ่มตัวนี้เข้าไปในกลุ่ม useMemo เพื่อให้ SummaryCard เรียกใช้ได้
+const totalLoanDebt = useMemo(() => 
+    cards
+        .filter(item => item.type === 'Loan')
+        .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
+, [cards]);
+
 
     const SummaryCard = ({ title, value, color }) => (
         <div style={{ padding: '15px', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderTop: `4px solid ${color}` }}>
