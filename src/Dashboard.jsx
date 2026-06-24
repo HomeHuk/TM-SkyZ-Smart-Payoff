@@ -143,56 +143,47 @@ function Dashboard() {
         }
     };
     
-    // 1. ใช้ useMemo เพื่อป้องกันการคำนวณซ้ำซ้อนและเพิ่มความเสถียร
-const totals = useMemo(() => {
-    return cards.reduce((acc, c) => {
+   const totals = cards.reduce((acc, c) => {
         acc.limit += Number(c.total_debt || 0);
         acc.minPay += Number(c.minimum_payment || 0);
         acc.paidReal += Number(c.paid_amount || 0);
         acc.principalPaid += Number(c.principal_paid || 0);
         acc.interestPaid += Number(c.interest_paid || 0);
-        acc.cashbackTotal += Number(c.cash_back || 0);
+        acc.cashbackTotal += Number(c.cash_back || 0); // รวมเงินคืนรายบัตร
         acc.cashbackUsedTotal += Number(c.cashback_used || 0);
         return acc;
     }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
-}, [cards]);
 
-// 2. คำนวณยอดรวมหนี้ทั้งสิ้น (Credit Card + Loan)
-const totalAllDebt = useMemo(() => 
-    cards
+    // คำนวณยอดรวมหนี้ทั้งสิ้น (Credit Card + Loan)
+    const totalAllDebt = cards
         .filter(item => item.type === 'Credit Card' || item.type === 'Loan')
-        .reduce((sum, item) => sum + (Number(item.total_debt) || 0), 0)
-, [cards]);
+        .reduce((sum, item) => sum + (Number(item.total_debt) || 0), 0);
 
-// 3. ยอดสินเชื่อคงเหลือปัจจุบัน
-const totalLoanBalance = useMemo(() => 
-    cards
+    // คำนวณยอดรวมเฉพาะสินเชื่อ (Loan)
+    const totalLoanDebt = cards
+        .filter(item => item.type === 'Loan')
+        .reduce((sum, item) => sum + Number(item.total_debt), 0);
+
+    // ยอดสินเชื่อคงเหลือปัจจุบัน
+    const totalLoanBalance = cards
         .filter(item => item.type === 'Loan')
         .reduce((sum, item) => {
-            const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
+            // หนี้คงเหลือรายใบ = ยอดเริ่มต้น - เงินต้นที่จ่ายแล้ว
+            const balance = Number(item.total_debt) - Number(item.principal_paid || 0);
             return sum + (balance > 0 ? balance : 0);
-        }, 0)
-, [cards]);
+        }, 0);
 
-// 4. ยอดคงเหลือบัตรเครดิตปัจจุบัน
-const totalCreditCardBalance = useMemo(() => 
-    cards
+    // ยอดคงเหลือบัตรเครดิตปัจจุบัน
+    const totalCreditCardBalance = cards
         .filter(item => item.type === 'Credit Card')
         .reduce((sum, item) => {
-            const balance = Number(item.total_debt || 0) - Number(item.principal_paid || 0);
+            // หนี้คงเหลือรายใบ = ยอดเริ่มต้น - เงินต้นที่จ่ายแล้ว
+            const balance = Number(item.total_debt) - Number(item.principal_paid || 0);
             return sum + (balance > 0 ? balance : 0);
-        }, 0)
-, [cards]);
+        }, 0);
 
-// 5. หนี้คงเหลือสุทธิ
-const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
-
-// เพิ่มตัวนี้เข้าไปในกลุ่ม useMemo เพื่อให้ SummaryCard เรียกใช้ได้
-const totalLoanDebt = useMemo(() => 
-    cards
-        .filter(item => item.type === 'Loan')
-        .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
-, [cards]);
+    // หนี้คงเหลือ = (ยอดหนี้รวมทั้งสิ้น - เงินต้นที่จ่ายไป) + เงินคืนที่ใช้ไป
+    const netDebt = (totalAllDebt - totals.principalPaid) + totals.cashbackUsedTotal;
 
 
     const SummaryCard = ({ title, value, color }) => (
