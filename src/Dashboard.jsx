@@ -7,7 +7,7 @@ function Dashboard() {
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [newCard, setNewCard] = useState({ card_name: '', total_debt: 0, minimum_payment: 0, due_date: '' });
+    const [newCard, setNewCard] = useState({ card_name: '', total_debt: 0, minimum_payment: 0, due_date: '', type: 'Credit Card' });
     // 1. เพิ่ม State สำหรับจัดการเดือนและ UserID
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // ปี-เดือน
     const [userPhone, setUserPhone] = useState('');
@@ -153,6 +153,13 @@ function Dashboard() {
         return acc;
     }, { limit: 0, minPay: 0, paidReal: 0, principalPaid: 0, interestPaid: 0, cashbackTotal: 0, cashbackUsedTotal: 0 });
 
+    // คำนวณยอดรวมทั้งหมด (บัตร + สินเชื่อ)
+    const totalAllDebt = cards.reduce((sum, item) => sum + Number(item.total_debt), 0);
+
+    // คำนวณยอดรวมเฉพาะสินเชื่อ (Loan)
+    const totalLoanDebt = cards
+        .filter(item => item.type === 'Loan')
+        .reduce((sum, item) => sum + Number(item.total_debt), 0);
 
     // หนี้คงเหลือ = (หนี้เริ่มต้น - เงินต้นที่จ่ายไป) + เงินคืนที่ใช้ไป
     const netDebt = (totals.limit - totals.principalPaid) + totals.cashbackUsedTotal;
@@ -252,6 +259,9 @@ function Dashboard() {
             {loading ? <p>กำลังโหลดข้อมูล...</p> : (
                 <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '25px' }}>
+                        {/* สองอันนี้คืออันใหม่ที่คุณต้องการ */}
+                        <SummaryCard title="ยอดรวมหนี้ทั้งสิ้น" value={totalAllDebt.toLocaleString()} color="#7c3aed" />
+                        <SummaryCard title="ยอดรวมสินเชื่อ" value={totalLoanDebt.toLocaleString()} color="#be185d" />
                         <SummaryCard title="วงเงินรวม" value={totals.limit} color="#3b82f6" />
                         <SummaryCard title="ขั้นต่ำต้องจ่าย" value={totals.minPay} color="#f59e0b" />
                         <SummaryCard title="จ่ายจริงรวม" value={totals.paidReal} color="#059669" />
