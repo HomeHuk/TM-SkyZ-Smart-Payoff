@@ -1,4 +1,4 @@
-import { useEffect, useState , useMemo} from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
@@ -142,8 +142,8 @@ function Dashboard() {
             ));
         }
     };
-    
-   const totals = cards.reduce((acc, c) => {
+
+    const totals = cards.reduce((acc, c) => {
         acc.limit += Number(c.total_debt || 0);
         acc.minPay += Number(c.minimum_payment || 0);
         acc.paidReal += Number(c.paid_amount || 0);
@@ -158,6 +158,13 @@ function Dashboard() {
     const totalAllDebt = cards
         .filter(item => item.type === 'Credit Card' || item.type === 'Loan')
         .reduce((sum, item) => sum + (Number(item.total_debt) || 0), 0);
+
+    // 1. ยอดรวมเฉพาะบัตรเครดิต (Credit Card)
+    const totalCreditCardDebt = useMemo(() =>
+        cards
+            .filter(item => item.type === 'Credit Card')
+            .reduce((sum, item) => sum + Number(item.total_debt || 0), 0)
+        , [cards]);
 
     // คำนวณยอดรวมเฉพาะสินเชื่อ (Loan)
     const totalLoanDebt = cards
@@ -290,9 +297,9 @@ function Dashboard() {
                         <SummaryCard title="ดอกเบี้ยที่จ่าย" value={totals.interestPaid} color="#f97316" />
                         <SummaryCard title="เงินคืนรวม" value={totals.cashbackTotal} color="#8b5cf6" />
                         <SummaryCard title="เงินคืนที่ใช้" value={totals.cashbackUsedTotal} color="#6366f1" />
-                        <SummaryCard title="ยอดสินเชื่อคงเหลือ" value={totalLoanBalance.toLocaleString()} color="#db2777" />
-                        <SummaryCard title="ยอดบัตรเครดิตคงเหลือ" value={totalCreditCardBalance.toLocaleString()} color="#3b82f6" />
-                        <SummaryCard title="หนี้คงเหลือ" value={netDebt} color="#ef4444" />
+                        <SummaryCard title="สินเชื่อคงเหลือ" value={totalLoanBalance.toLocaleString()} color="#db2777" />
+                        <SummaryCard title="บัตรเครดิตคงเหลือ" value={totalCreditCardBalance.toLocaleString()} color="#3b82f6" />
+                        <SummaryCard title="ยอดหนี้คงเหลือทั้งสิ้น" value={netDebt} color="#ef4444" />
                     </div>
 
 
