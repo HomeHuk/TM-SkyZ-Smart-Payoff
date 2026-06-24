@@ -40,61 +40,61 @@ function Dashboard() {
 
 
     // ฟังก์ชันนี้เรียกใช้เมื่อ selectedMonth เปลี่ยน หรือตอนโหลดหน้าครั้งแรก
-   const fetchData = async (targetMonth) => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const fetchData = async (targetMonth) => {
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-    // 1. ดึงข้อมูลของเดือนที่เลือก
-    let { data, error } = await supabase
-        .from('credit_cards')
-        .select('*') // ดึงทุกข้อมูล
-        .eq('user_id', user.id)
-        .eq('month', targetMonth)
-        .order('due_date', { ascending: true });
-
-    // 2. ถ้าเดือนที่เลือกว่างเปล่า ให้ Copy จาก 2026-06
-    if (data && data.length === 0 && targetMonth !== '2026-06') {
-        const { data: masterData } = await supabase
+        // 1. ดึงข้อมูลของเดือนที่เลือก
+        let { data, error } = await supabase
             .from('credit_cards')
-            .select('*') // ดึงข้อมูล Master มาทั้งหมด
+            .select('*') // ดึงทุกข้อมูล
             .eq('user_id', user.id)
-            .eq('month', '2026-06');
+            .eq('month', targetMonth)
+            .order('due_date', { ascending: true });
 
-        if (masterData && masterData.length > 0) {
-            // สร้างข้อมูลชุดใหม่จากรายการ Master
-            const newData = masterData.map(c => ({
-                card_name: c.card_name,
-                total_debt: c.total_debt,
-                minimum_payment: c.minimum_payment,
-                due_date: c.due_date,
-                interest_rate: c.interest_rate,
-                user_id: user.id,
-                month: targetMonth, // เปลี่ยนเป็นเดือนใหม่
-                paid_amount: 0,
-                interest_paid: 0,
-                principal_paid: 0,
-                cash_back: 0,
-                cashback_used: 0
-            }));
-
-            // บันทึกรายการใหม่ทั้งหมดลง DB
-            await supabase.from('credit_cards').insert(newData);
-            
-            // ดึงข้อมูลอีกครั้งเพื่อให้แสดงผลครบ
-            const { data: finalData } = await supabase
+        // 2. ถ้าเดือนที่เลือกว่างเปล่า ให้ Copy จาก 2026-06
+        if (data && data.length === 0 && targetMonth !== '2026-06') {
+            const { data: masterData } = await supabase
                 .from('credit_cards')
-                .select('*')
+                .select('*') // ดึงข้อมูล Master มาทั้งหมด
                 .eq('user_id', user.id)
-                .eq('month', targetMonth)
-                .order('id', { ascending: true });
-            data = finalData;
-        }
-    }
+                .eq('month', '2026-06');
 
-    setCards(data || []);
-    setLoading(false);
-};
+            if (masterData && masterData.length > 0) {
+                // สร้างข้อมูลชุดใหม่จากรายการ Master
+                const newData = masterData.map(c => ({
+                    card_name: c.card_name,
+                    total_debt: c.total_debt,
+                    minimum_payment: c.minimum_payment,
+                    due_date: c.due_date,
+                    interest_rate: c.interest_rate,
+                    user_id: user.id,
+                    month: targetMonth, // เปลี่ยนเป็นเดือนใหม่
+                    paid_amount: 0,
+                    interest_paid: 0,
+                    principal_paid: 0,
+                    cash_back: 0,
+                    cashback_used: 0
+                }));
+
+                // บันทึกรายการใหม่ทั้งหมดลง DB
+                await supabase.from('credit_cards').insert(newData);
+
+                // ดึงข้อมูลอีกครั้งเพื่อให้แสดงผลครบ
+                const { data: finalData } = await supabase
+                    .from('credit_cards')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('month', targetMonth)
+                    .order('id', { ascending: true });
+                data = finalData;
+            }
+        }
+
+        setCards(data || []);
+        setLoading(false);
+    };
 
 
     // ใช้ useEffect นี้เพียงชุดเดียวเพื่อกระตุ้นการดึงข้อมูล
@@ -329,24 +329,37 @@ function Dashboard() {
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                 {[
+                                    { placeholder: 'ประเภท', key: 'type', type: 'select' }, // <--- เพิ่มบรรทัดนี้
                                     { placeholder: 'ชื่อบัตร / สินเชื่อ', key: 'card_name', type: 'text' },
                                     { placeholder: 'ยอดหนี้รวม', key: 'total_debt', type: 'number' },
                                     { placeholder: 'ยอดขั้นต่ำ', key: 'minimum_payment', type: 'number' },
                                     { placeholder: 'วันที่ครบกำหนด (เช่น 1)', key: 'due_date', type: 'text' }
                                 ].map((field) => (
                                     <div key={field.key} style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <input
-                                            type={field.type}
-                                            placeholder={field.placeholder}
-                                            onChange={(e) => setNewCard({ ...newCard, [field.key]: e.target.value })}
-                                            style={{
-                                                padding: '12px',
-                                                borderRadius: '8px',
-                                                border: '1px solid #cbd5e1',
-                                                fontSize: '0.95rem',
-                                                outline: 'none'
-                                            }}
-                                        />
+                                        {field.type === 'select' ? (
+                                            // กรณีที่เป็น Dropdown (Select)
+                                            <select
+                                                onChange={(e) => setNewCard({ ...newCard, type: e.target.value })}
+                                                style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.95rem' }}
+                                            >
+                                                <option value="Credit Card">บัตรเครดิต</option>
+                                                <option value="Loan">สินเชื่อนอกระบบ</option>
+                                            </select>
+                                        ) : (
+                                            // กรณีที่เป็น Input ปกติ
+                                            <input
+                                                type={field.type}
+                                                placeholder={field.placeholder}
+                                                onChange={(e) => setNewCard({ ...newCard, [field.key]: e.target.value })}
+                                                style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #cbd5e1',
+                                                    fontSize: '0.95rem',
+                                                    outline: 'none'
+                                                }}
+                                            />
+                                        )}
                                     </div>
                                 ))}
                             </div>
