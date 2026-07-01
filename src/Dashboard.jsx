@@ -17,20 +17,25 @@ function Dashboard() {
 
 
     const handleAddCard = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { error } = await supabase
-            .from('credit_cards')
-            .insert([{ ...newCard, user_id: user.id, month: selectedMonth }]);
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // ตรวจสอบให้แน่ใจว่าได้ส่งค่า month ไปด้วยทุกครั้ง
+    const { error } = await supabase
+        .from('credit_cards')
+        .insert([{ 
+            ...newCard, 
+            user_id: user.id, 
+            month: selectedMonth // <--- ต้องมีบรรทัดนี้!
+        }]);
 
-
-        if (error) {
-            console.error("Error adding card:", error);
-        } else {
-            setShowForm(false);
-            setNewCard({ card_name: '', total_debt: 0, minimum_payment: 0, due_date: '' });
-            fetchData(); // ดึงข้อมูลใหม่มาแสดง
-        }
-    };
+    if (error) {
+        console.error("Error adding card:", error);
+    } else {
+        setShowForm(false);
+        setNewCard({ card_name: '', total_debt: 0, minimum_payment: 0, due_date: '', type: 'Credit Card' });
+        fetchData(selectedMonth); // ดึงข้อมูลของเดือนปัจจุบันมาโชว์
+    }
+};
 
 
     const handleLogout = async () => {
@@ -41,60 +46,56 @@ function Dashboard() {
 
     // ฟังก์ชันนี้เรียกใช้เมื่อ selectedMonth เปลี่ยน หรือตอนโหลดหน้าครั้งแรก
     const fetchData = async (targetMonth) => {
-        setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-        // 1. ดึงข้อมูลของเดือนที่เลือก
-        let { data, error } = await supabase
-            .from('credit_cards')
-            .select('*') // ดึงทุกข้อมูล
-            .eq('user_id', user.id)
-            .eq('month', targetMonth)
-            .order('due_date', { ascending: true });
+    // 1. ดึงข้อมูลของเดือนที่เลือกมาดูก่อน
+    let { data: currentMonthData } = await supabase
+        .from('credit_cards')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('month', targetMonth);
 
-        // 2. ถ้าเดือนที่เลือกว่างเปล่า ให้ Copy จาก 2026-06
-        if (data && data.length === 0 && targetMonth !== '2026-06') {
-            const { data: masterData } = await supabase
-                .from('credit_cards')
-                .select('*') // ดึงข้อมูล Master มาทั้งหมด
-                .eq('user_id', user.id)
-                .eq('month', '2026-06');
-
-            if (masterData && masterData.length > 0) {
-                // สร้างข้อมูลชุดใหม่จากรายการ Master
-                const newData = masterData.map(c => ({
-                    card_name: c.card_name,
-                    total_debt: c.total_debt,
-                    minimum_payment: c.minimum_payment,
-                    due_date: c.due_date,
-                    interest_rate: c.interest_rate,
-                    user_id: user.id,
-                    month: targetMonth, // เปลี่ยนเป็นเดือนใหม่
-                    paid_amount: 0,
-                    interest_paid: 0,
-                    principal_paid: 0,
-                    cash_back: 0,
-                    cashback_used: 0
-                }));
-
-                // บันทึกรายการใหม่ทั้งหมดลง DB
-                await supabase.from('credit_cards').insert(newData);
-
-                // ดึงข้อมูลอีกครั้งเพื่อให้แสดงผลครบ
-                const { data: finalData } = await supabase
-                    .from('credit_cards')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('month', targetMonth)
-                    .order('id', { ascending: true });
-                data = finalData;
-            }
-        }
-
-        setCards(data || []);
+    if (currentMonthData && currentMonthData.length > 0) {
+        setCards(currentMonthData);
         setLoading(false);
-    };
+        return; 
+    }
+
+    // 3. ดึง Master List เฉพาะเดือนตั้งต้น (เช่น เดือนแรกที่บันทึกไว้)
+    // แนะนำให้เลือกเดือนที่ชัวร์ที่สุดของคุณ เช่น '2026-06'
+    const { data: masterCards } = await supabase
+        .from('credit_cards')
+        .select('card_name, total_debt, minimum_payment, due_date, type')
+        .eq('user_id', user.id)
+        .eq('month', '2026-06'); // <--- เจาะจงเดือนที่เป็นต้นฉบับ
+
+    if (masterCards && masterCards.length > 0) {
+        const newData = masterCards.map(c => ({
+            ...c,
+            user_id: user.id,
+            month: targetMonth, // เดือนใหม่ที่จะสร้าง
+            paid_amount: 0,
+            interest_paid: 0,
+            principal_paid: 0,
+            cash_back: 0,
+            cashback_used: 0
+        }));
+        
+        await supabase.from('credit_cards').insert(newData);
+        
+        const { data: finalData } = await supabase
+            .from('credit_cards')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('month', targetMonth);
+        setCards(finalData || []);
+    } else {
+        setCards([]);
+    }
+    setLoading(false);
+};
 
 
     // ใช้ useEffect นี้เพียงชุดเดียวเพื่อกระตุ้นการดึงข้อมูล
